@@ -30,9 +30,12 @@ import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+
+try:
+    import requests
+except ImportError:
+    sys.exit("ERROR: requests is required.  pip install requests")
 
 try:
     from botocore.session import Session
@@ -46,8 +49,8 @@ TOOL_NAME = "WebSearch"
 PROTOCOL_VERSION = "2025-06-18"
 
 # The gateway endpoint must be an HTTPS AgentCore Gateway host. We validate the
-# configured URL against this before handing it to urllib, because urllib also
-# honours non-HTTP schemes (e.g. file://, ftp://) — a value like
+# configured URL before making any request. Although the client uses requests
+# (HTTP/HTTPS only), validating here keeps the guarantee explicit and local — a value like
 # "file:///etc/passwd" would otherwise be read as a local file (SSRF / local file
 # read). Restricting to https on a *.gateway.bedrock-agentcore.<region>.amazonaws.com
 # host closes that vector.
@@ -89,11 +92,10 @@ class AgentCoreWebSearch:
     def _validate_url(url):
         """Reject anything that is not an HTTPS AgentCore Gateway URL.
 
-        This runs before the URL ever reaches urllib. urllib honours non-HTTP
-        schemes such as file:// and ftp://, so without this check a malicious or
-        misconfigured AGENTCORE_GATEWAY_URL (e.g. "file:///etc/passwd") could turn
-        a "search" into an arbitrary local-file read or SSRF. Restricting to https
-        on a known AgentCore Gateway host eliminates that class of attack.
+        The client uses the requests library (HTTP/HTTPS only), but we still pin
+        the URL to https on a known AgentCore Gateway host as defence in depth, so
+        a malicious or misconfigured AGENTCORE_GATEWAY_URL cannot redirect requests
+        to an unintended host or downgrade the scheme.
         """
         if not url:
             raise MCPError("gateway URL is empty")
@@ -146,30 +148,36 @@ class AgentCoreWebSearch:
             SigV4Auth(self.creds, SERVICE, self.region).add_auth(aws_req)
             signed = dict(aws_req.headers)
 
-            req = urllib.request.Request(
-                self.url, data=body, headers=signed, method="POST"
-            )
+            # Use requests (HTTP/HTTPS only) rather than urllib, which also honours
+            # file://, ftp://, etc. self.url is additionally validated by
+            # _validate_url(), so this is defence in depth.
             try:
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    sid = resp.headers.get("Mcp-Session-Id")
-                    if sid:
-                        self._session_id = sid
-                    ctype = resp.headers.get("Content-Type", "")
-                    raw = resp.read().decode("utf-8")
-                break
-            except urllib.error.HTTPError as e:
-                detail = e.read().decode("utf-8", "replace")
-                last_err = MCPError(f"HTTP {e.code} {e.reason}: {detail}")
-                if e.code in self._RETRY_STATUSES and attempt < self._MAX_ATTEMPTS:
-                    time.sleep(min(2 ** (attempt - 1), 8))  # 1,2,4,8s backoff
-                    continue
-                raise last_err from None
-            except urllib.error.URLError as e:
-                last_err = MCPError(f"connection error: {e.reason}")
+                resp = requests.post(
+                    self.url, data=body, headers=signed, timeout=60
+                )
+            except requests.exceptions.RequestException as e:
+                last_err = MCPError(f"connection error: {e}")
                 if attempt < self._MAX_ATTEMPTS:
                     time.sleep(min(2 ** (attempt - 1), 8))
                     continue
                 raise last_err from None
+
+            if resp.status_code >= 400:
+                last_err = MCPError(
+                    f"HTTP {resp.status_code} {resp.reason}: {resp.text}"
+                )
+                if resp.status_code in self._RETRY_STATUSES \
+                        and attempt < self._MAX_ATTEMPTS:
+                    time.sleep(min(2 ** (attempt - 1), 8))  # 1,2,4,8s backoff
+                    continue
+                raise last_err from None
+
+            sid = resp.headers.get("Mcp-Session-Id")
+            if sid:
+                self._session_id = sid
+            ctype = resp.headers.get("Content-Type", "")
+            raw = resp.text
+            break
 
         # Notifications (no id) return empty/202 — nothing to parse.
         if not raw.strip():

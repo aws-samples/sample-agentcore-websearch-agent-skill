@@ -1,5 +1,6 @@
-# Runtime dependency for the search CLI (agentcore_websearch.py).
-# Only used to resolve credentials and SigV4-sign MCP requests — any recent
-# boto3 works (botocore comes transitively). Infrastructure creation uses the
-# AWS CLI, not boto3.
+# Runtime dependencies for the search CLI (agentcore_websearch.py).
+# - boto3: resolve credentials + SigV4-sign MCP requests (botocore comes with it).
+# - requests: HTTP transport (HTTP/HTTPS only — avoids urllib's file:// scheme risk).
+# Infrastructure creation uses the AWS CLI, not these.
 boto3>=1.34
+requests>=2.25
