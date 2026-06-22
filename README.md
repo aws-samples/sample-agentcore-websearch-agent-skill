@@ -127,10 +127,15 @@ folder into your Claude Code skills directory:
 cp -r skills/agentcore-websearch ~/.claude/skills/
 ```
 
-Set `AGENTCORE_GATEWAY_URL` (and optionally `AWS_PROFILE`) in your environment, then
-ask Claude Code to "search the web with agentcore". The skill calls the `websearch`
-wrapper in this repo (set `AGENTCORE_WEBSEARCH_DIR` if the repo isn't at its default
-path — see the SKILL.md).
+The skill manages the **full lifecycle** — checking status, creating the gateway
+(`setup.sh`), searching, and tearing it down (`teardown.sh`). It asks for your
+explicit confirmation before any setup or teardown, since those create or delete
+billable AWS resources. Searching an already-configured gateway runs without
+prompting.
+
+Set `AGENTCORE_WEBSEARCH_DIR` if the repo isn't at the default `~/agentcore-websearch`
+path. Then ask Claude Code to "set up agentcore websearch", "search the web with
+agentcore", or "tear down agentcore" — see the SKILL.md for details.
 
 ## ⚠️ Note on the InvokeWebSearch ARN
 
