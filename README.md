@@ -22,19 +22,30 @@ URLs, snippets, and publication dates. Pricing is ~$7 per 1,000 queries.
 ## How it works
 
 ```
-your machine                         AWS account (us-east-1)
-┌──────────────┐   SigV4 (IAM)   ┌─────────────────────────┐   assume role   ┌──────────────┐
-│ websearch CLI│ ───────────────▶│ AgentCore Gateway (MCP) │ ───────────────▶│ web-search    │
-│ (this repo)  │  tools/call     │ authorizer: AWS_IAM     │  InvokeWebSearch│ connector     │
-└──────────────┘                 └─────────────────────────┘                 └──────────────┘
+your machine                              AWS account (us-east-1)
+┌──────────────┐                       ┌──────────────────────────┐                  ┌──────────────┐
+│ websearch CLI│   MCP over HTTPS       │  AgentCore Gateway        │   assume role    │ web-search   │
+│              │   (JSON-RPC 2.0:       │  MCP endpoint  /mcp       │ ───────────────▶ │ connector    │
+│ agentcore_   │    initialize,         │  authorizer: AWS_IAM      │  InvokeWebSearch │ (managed     │
+│ websearch.py │    tools/list,         │                           │                  │  web index)  │
+│  + requests  │    tools/call)         │                           │                  │              │
+│              │ ─────────────────────▶ │                           │                  │              │
+│              │   SigV4-signed (IAM)   │                           │                  │              │
+└──────────────┘                       └──────────────────────────┘                  └──────────────┘
 ```
 
-- **Inbound** (you → gateway): each HTTPS request is SigV4-signed as service
+The CLI is a minimal **MCP (Model Context Protocol) client**: it speaks JSON-RPC 2.0
+over Streamable HTTP to the gateway's `/mcp` endpoint — an `initialize` handshake
+(carrying the `Mcp-Session-Id`), then `tools/list` and `tools/call` for the
+`WebSearch` tool. Every one of those HTTP(S) requests is SigV4-signed.
+
+- **Inbound** (CLI → gateway): each MCP HTTPS request is SigV4-signed as service
   `bedrock-agentcore`. The signing region is derived from the gateway hostname, so a
   mismatched `AWS_REGION` in your shell won't break it. Your IAM principal needs
   `bedrock-agentcore:InvokeGateway` on the gateway.
 - **Outbound** (gateway → connector): the gateway assumes a service role that grants
-  `bedrock-agentcore:InvokeWebSearch`.
+  `bedrock-agentcore:InvokeWebSearch`, then calls the managed web-search connector
+  entirely within AWS.
 
 ## Prerequisites
 
