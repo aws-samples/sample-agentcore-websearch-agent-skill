@@ -8,9 +8,13 @@ does **not** create or delete anything.
 
 Scope of this guide:
 
-- **`setup.sh`** — create the IAM role, the AgentCore Gateway, and the web-search
-  target; write the gateway URL into the search skill's `.env`.
-- **`teardown.sh`** — delete everything `setup.sh` created.
+- **`setup.sh`** — deploy the CloudFormation stack
+  (`cfn/agentcore-websearch.yaml`: IAM role + AgentCore Gateway + web-search target),
+  then write the gateway URL into the search skill's `.env`.
+- **`teardown.sh`** — delete the CloudFormation stack (and the local `.env`).
+
+Everything is provisioned as **one AWS CloudFormation stack** (`agentcore-websearch`),
+so creation/deletion is atomic and auditable.
 
 > [!WARNING]
 > **Not for production.** This is a sample. `setup.sh` creates billable resources
@@ -44,13 +48,15 @@ aws bedrock-agentcore-control list-gateways --region us-east-1 \
 > billable AWS resources. State what will be created and the ~$7/1,000-query cost,
 > then wait for a clear "yes".
 
-It creates, all in `us-east-1`:
+It deploys the CloudFormation stack `agentcore-websearch`, which creates, all in
+`us-east-1`:
 
-1. IAM service role `AgentCoreWebSearchGatewayRole` — the gateway assumes it at query
-   time to call the connector (`bedrock-agentcore:InvokeGateway` + `InvokeWebSearch`).
-2. AgentCore Gateway `WebSearchGateway` with **`AWS_IAM`** inbound auth (callers use
-   their own IAM/SigV4 credentials — no tokens).
-3. A `web-search` connector target exposing the `WebSearch` tool.
+1. An IAM service role — the gateway assumes it at query time to call the connector
+   (`bedrock-agentcore:InvokeGateway` + `InvokeWebSearch`).
+2. AgentCore Gateway `WebSearchGateway` (`AWS::BedrockAgentCore::Gateway`) with
+   **`AWS_IAM`** inbound auth (callers use their own IAM/SigV4 credentials — no tokens).
+3. A `web-search` connector target (`AWS::BedrockAgentCore::GatewayTarget`) exposing
+   the `WebSearch` tool.
 
 Run it from the project root:
 
@@ -59,13 +65,14 @@ Run it from the project root:
 AWS_PROFILE=your-profile ./setup.sh
 ```
 
-Optional overrides (defaults shown): `REGION=us-east-1`, `GATEWAY_NAME=WebSearchGateway`,
-`ROLE_NAME=AgentCoreWebSearchGatewayRole`, `TARGET_NAME=web-search-tool`. If you change
-the names, pass the same ones to `teardown.sh`.
+Optional overrides (defaults shown): `REGION=us-east-1`, `STACK_NAME=agentcore-websearch`,
+`GATEWAY_NAME=WebSearchGateway`, `TARGET_NAME=web-search-tool`. If you change
+`STACK_NAME`, pass the same one to `teardown.sh`.
 
-`setup.sh` is **idempotent** (reuses an existing role/gateway/target) and, on success:
+`setup.sh` is **idempotent** — CloudFormation updates the existing stack in place if
+it's already deployed. On success it:
 
-- prints the gateway URL, and
+- prints the gateway URL (the stack's `GatewayUrl` output), and
 - writes it into `skills/agentcore-websearch/.env` so the search skill works
   immediately.
 
@@ -75,9 +82,9 @@ After setup, search from the skill bundle:
 
 ```bash
 cd skills/agentcore-websearch
-python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt   # once
-./websearch "latest AWS news"
-./websearch "newest python version" --max-results 5 --json
+python3 -m venv .venv && . .venv/bin/activate && pip install .   # once
+agentcore-websearch "latest AWS news"
+agentcore-websearch "newest python version" --max-results 5 --json
 ```
 
 See [`skills/agentcore-websearch/SKILL.md`](skills/agentcore-websearch/SKILL.md) for
@@ -99,15 +106,15 @@ AWS_PROFILE=your-profile ./teardown.sh
 Then optionally remove local artifacts:
 
 ```bash
-rm -rf skills/agentcore-websearch/.venv skills/agentcore-websearch/.env
+rm -rf skills/agentcore-websearch/.venv
 ```
+(`teardown.sh` already removes `skills/agentcore-websearch/.env`.)
 
 Verify nothing remains:
 
 ```bash
-aws bedrock-agentcore-control list-gateways --region us-east-1 \
-  --query "items[?name=='WebSearchGateway'].gatewayId" --output text
-# (empty output = fully torn down)
+aws cloudformation describe-stacks --stack-name agentcore-websearch --region us-east-1
+# (an error "Stack ... does not exist" = fully torn down)
 ```
 
 ## Confirmation policy (for agents)

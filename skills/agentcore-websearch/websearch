@@ -1,35 +1,20 @@
 #!/usr/bin/env bash
-# Convenience wrapper for the AgentCore Web Search CLI.
+# Convenience wrapper around the packaged CLI. The supported entry point is the
+# `agentcore-websearch` console command installed via `pip install .` (or pipx);
+# this wrapper just runs it from the bundle's own venv so `./websearch ...` works
+# without activating anything. It also loads this folder's .env automatically (the
+# Python CLI does that itself, too).
 #
-# Configuration (via environment, or a local .env file next to this script):
-#   AGENTCORE_GATEWAY_URL   (required) the gateway MCP URL
-#   AWS_PROFILE             (optional) AWS profile; otherwise default cred chain
-#
-# Usage:
-#   export AGENTCORE_GATEWAY_URL="https://<gateway-id>.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
-#   ./websearch "your query"
-#   ./websearch "your query" --max-results 5 --json
-#
+#   pip install .            # then:  agentcore-websearch "query"
+#   ./websearch "query"      # equivalent, via the bundle venv
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Load a local .env if present (not committed; see .env.example).
-if [ -f "$HERE/.env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . "$HERE/.env"
-  set +a
-fi
-
-if [ -z "${AGENTCORE_GATEWAY_URL:-}" ]; then
-  echo "ERROR: AGENTCORE_GATEWAY_URL is not set." >&2
-  echo "  Set it in your shell or in $HERE/.env (see .env.example)." >&2
-  echo "  If the gateway is not set up yet, follow AGENTS.md in the project repo." >&2
-  exit 1
-fi
-export AGENTCORE_GATEWAY_URL
 
 PY="$HERE/.venv/bin/python"
 [ -x "$PY" ] || PY="$(command -v python3)"
 
-exec "$PY" "$HERE/agentcore_websearch.py" "$@"
+# Prefer the installed console script if present; else run the module directly.
+if [ -x "$HERE/.venv/bin/agentcore-websearch" ]; then
+  exec "$HERE/.venv/bin/agentcore-websearch" "$@"
+fi
+exec "$PY" -m agentcore_websearch.cli "$@"

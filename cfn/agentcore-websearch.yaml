@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AgentCore Web Search (sample) — an Amazon Bedrock AgentCore Gateway with AWS_IAM
+  (SigV4) inbound auth and the managed web-search connector tool. Callers invoke the
+  gateway with their own IAM credentials; the gateway assumes the service role below
+  to call the web-search connector. NOT for production (see repo README/AGENTS.md).
+
+Parameters:
+  GatewayName:
+    Type: String
+    Default: WebSearchGateway
+    Description: Name of the AgentCore Gateway.
+    AllowedPattern: "^[a-zA-Z0-9_-]{1,100}$"
+  TargetName:
+    Type: String
+    Default: web-search-tool
+    Description: Name of the gateway target (also namespaces the tool).
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_-]*$"
+
+Resources:
+  # Service role the gateway assumes (outbound) to call the web-search connector.
+  GatewayServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: AgentCore Gateway role for the Web Search connector.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowAgentCoreToAssumeRole
+            Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:gateway/*"
+      Policies:
+        - PolicyName: WebSearchGatewayInline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeGateway
+                Effect: Allow
+                Action: bedrock-agentcore:InvokeGateway
+                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:gateway/*"
+              # NOTE: the working ARN includes the region; the docs' empty-region
+              # form (arn:aws:bedrock-agentcore::aws:tool/web-search.v1) is rejected.
+              - Sid: InvokeWebSearch
+                Effect: Allow
+                Action: bedrock-agentcore:InvokeWebSearch
+                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:aws:tool/web-search.v1"
+
+  # The MCP gateway, authenticated inbound with the caller's IAM identity (SigV4).
+  Gateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    Properties:
+      Name: !Ref GatewayName
+      Description: AgentCore Web Search via IAM/SigV4 (sample).
+      ProtocolType: MCP
+      AuthorizerType: AWS_IAM
+      RoleArn: !GetAtt GatewayServiceRole.Arn
+
+  # The built-in web-search connector exposed as the WebSearch tool.
+  WebSearchTarget:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    Properties:
+      GatewayIdentifier: !GetAtt Gateway.GatewayIdentifier
+      Name: !Ref TargetName
+      Description: Built-in Web Search connector.
+      CredentialProviderConfigurations:
+        - CredentialProviderType: GATEWAY_IAM_ROLE
+      TargetConfiguration:
+        Mcp:
+          Connector:
+            Source:
+              ConnectorId: web-search
+            Configurations:
+              - Name: WebSearch
+                ParameterValues: {}
+
+Outputs:
+  GatewayUrl:
+    Description: MCP endpoint URL — set as AGENTCORE_GATEWAY_URL for the search CLI.
+    Value: !GetAtt Gateway.GatewayUrl
+  GatewayId:
+    Description: AgentCore Gateway identifier.
+    Value: !GetAtt Gateway.GatewayIdentifier
+  GatewayServiceRoleArn:
+    Description: ARN of the gateway service role.
+    Value: !GetAtt GatewayServiceRole.Arn

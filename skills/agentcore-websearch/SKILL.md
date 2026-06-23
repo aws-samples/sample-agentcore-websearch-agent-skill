@@ -18,8 +18,9 @@ no API keys or tokens. Results are grounded, cited, and current.
 
 ## Self-contained — search files live in this folder
 
-This folder ships everything needed to *search*: `websearch`, `agentcore_websearch.py`,
-`requirements.txt`, `.env.example`, and this `SKILL.md`. Copying this one folder
+This folder ships everything needed to *search*: a packaged Python CLI
+(`pyproject.toml` + `src/agentcore_websearch/`), the `websearch` convenience wrapper,
+`.env.example`, and this `SKILL.md`. Copying this one folder
 (e.g. into `~/.claude/skills/`) gives a working search skill — provided a gateway
 already exists.
 
@@ -36,13 +37,18 @@ DIR="$HOME/.claude/skills/agentcore-websearch"   # or wherever this folder lives
   isn't set up yet, follow **AGENTS.md** in the project repository first.
 - AWS credentials available (an `AWS_PROFILE` or the default credential chain) whose
   IAM principal has `bedrock-agentcore:InvokeGateway` on the gateway.
-- **Python 3.9+**; the one dependency, `mcp-proxy-for-aws` (from `requirements.txt`),
-  brings boto3/botocore and the `mcp` SDK. Install once:
-  `cd "$DIR" && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt`
+- **Python 3.9+**. Install the CLI once (it declares its one dependency,
+  `mcp-proxy-for-aws`, which brings boto3/botocore and the `mcp` SDK):
+  `cd "$DIR" && python3 -m venv .venv && . .venv/bin/activate && pip install .`
+  This installs an `agentcore-websearch` console command. (`pipx install .` also works.)
 
 ## Search
 
 ```bash
+# after `pip install .` in this folder:
+agentcore-websearch "<search query>"
+
+# or, without activating the venv, the bundled wrapper:
 DIR="$HOME/.claude/skills/agentcore-websearch"   # this skill folder
 "$DIR/websearch" "<search query>"
 ```
@@ -53,8 +59,8 @@ Options:
   `title`, `publishedDate`)
 - `--list-tools` — show the gateway's tools (diagnostic)
 
-The wrapper reads `AGENTCORE_GATEWAY_URL` (and optional `AWS_PROFILE`) from this
-folder's `.env`, or from the environment if exported.
+The CLI auto-loads `AGENTCORE_GATEWAY_URL` (and optional `AWS_PROFILE`) from a `.env`
+in the current directory or the package directory, or from the environment if exported.
 
 ### Workflow
 
@@ -67,9 +73,8 @@ folder's `.env`, or from the environment if exported.
 ### Examples
 
 ```bash
-DIR="$HOME/.claude/skills/agentcore-websearch"
-"$DIR/websearch" "latest TypeScript release"
-"$DIR/websearch" "AWS re:Invent 2026 keynotes" --max-results 15 --json
+agentcore-websearch "latest TypeScript release"
+agentcore-websearch "AWS re:Invent 2026 keynotes" --max-results 15 --json
 ```
 
 ## Notes & limits
@@ -86,4 +91,4 @@ DIR="$HOME/.claude/skills/agentcore-websearch"
     env var, or provision it per the project's **AGENTS.md**.
   - credentials missing/expired → refresh your `AWS_PROFILE` / SSO login.
   - `Insufficient permissions` → caller lacks `bedrock-agentcore:InvokeGateway`.
-  - `mcp-proxy-for-aws is required` → `pip install -r requirements.txt` in this folder.
+  - `mcp-proxy-for-aws is required` → run `pip install .` in this folder.

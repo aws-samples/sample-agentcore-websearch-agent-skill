@@ -164,7 +164,30 @@ def print_results(payload):
         print()
 
 
+
+def _load_dotenv():
+    """Load KEY=VALUE lines from a local .env (cwd, then this file's dir) into the
+    environment, without overriding values already set. Keeps the packaged CLI
+    self-sufficient — no bash wrapper needed. Lines starting with # are ignored."""
+    import pathlib
+    seen = set()
+    for base in (pathlib.Path.cwd(), pathlib.Path(__file__).resolve().parent):
+        env_path = base / ".env"
+        if env_path in seen or not env_path.is_file():
+            continue
+        seen.add(env_path)
+        for raw in env_path.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
 def main():
+    _load_dotenv()
     p = argparse.ArgumentParser(
         prog="agentcore-websearch",
         description="Search the web via AWS Bedrock AgentCore Web Search (IAM/SigV4), "

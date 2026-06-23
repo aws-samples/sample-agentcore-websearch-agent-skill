@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentcore-websearch"
+version = "1.0.0"
+description = "CLI to search the web via an AWS Bedrock AgentCore Gateway using local AWS credentials (SigV4/IAM)."
+readme = "SKILL.md"
+requires-python = ">=3.9"
+license = "MIT-0"
+keywords = ["aws", "bedrock", "agentcore", "mcp", "web-search", "sigv4"]
+dependencies = [
+  # AWS MCP proxy library: SigV4 signing + streamable-HTTP MCP transport.
+  # Brings boto3, botocore, and the mcp SDK transitively.
+  "mcp-proxy-for-aws>=1.6",
+]
+
+[project.scripts]
+# Installs an `agentcore-websearch` console command -> agentcore_websearch.cli:main
+agentcore-websearch = "agentcore_websearch.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentcore_websearch"]

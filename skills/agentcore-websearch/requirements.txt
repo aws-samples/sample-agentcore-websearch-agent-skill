@@ -1,7 +1,0 @@
-# Runtime dependency for the search CLI (agentcore_websearch.py).
-# mcp-proxy-for-aws is AWS's library for AWS IAM (SigV4) MCP auth. The CLI imports
-# aws_iam_streamablehttp_client from it and drives the connection with the official
-# `mcp` SDK's ClientSession — no hand-rolled signing or transport. It pulls in
-# boto3, botocore, and the mcp SDK transitively.
-# Infrastructure creation (setup.sh) uses the AWS CLI, not this.
-mcp-proxy-for-aws>=1.6

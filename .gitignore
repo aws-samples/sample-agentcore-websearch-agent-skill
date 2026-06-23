@@ -17,3 +17,7 @@ __pycache__/
 .idea/
 .vscode/
 .claude/
+
+# Python packaging artifacts
+build/
+dist/

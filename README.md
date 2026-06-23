@@ -37,7 +37,7 @@ URLs, snippets, and publication dates. Pricing is ~$7 per 1,000 queries.
 your machine                                          AWS account (us-east-1)
 ┌────────────────────────────────┐   MCP over HTTPS    ┌──────────────────────┐   assume role    ┌──────────────┐
 │ websearch CLI (this repo)       │   (JSON-RPC 2.0:    │  AgentCore Gateway   │ ───────────────▶ │ web-search   │
-│  agentcore_websearch.py         │    initialize,      │  MCP endpoint  /mcp  │  InvokeWebSearch │ connector    │
+│  agentcore-websearch (package)  │    initialize,      │  MCP endpoint  /mcp  │  InvokeWebSearch │ connector    │
 │  • mcp_proxy_for_aws library    │ ──────────────────▶ │  authorizer: AWS_IAM │                  │ (managed     │
 │    (SigV4 streamable-http)      │    tools/list,      │                      │                  │  web index)  │
 │  • mcp SDK ClientSession        │    tools/call)      │                      │                  │              │
@@ -71,7 +71,8 @@ no hand-rolled signing code.
 - An AWS account and credentials (`aws configure` or SSO profile) with permission to
   create IAM roles and AgentCore gateways.
 - **AWS CLI v2 >= 2.35.0** and `bash` — earlier CLI versions lack the gateway
-  `connector` target shape (`setup.sh` checks and tells you to upgrade).
+  `connector` target shape (`setup.sh` checks and tells you to upgrade). Setup deploys
+  an **AWS CloudFormation** stack.
 - **Python 3.9+** — only for running the search CLI. Its one dependency is
   `mcp-proxy-for-aws` (which brings `boto3`, `botocore`, and the `mcp` SDK). Not
   needed to create the infrastructure.
@@ -99,20 +100,23 @@ The full setup/teardown guide is [AGENTS.md](AGENTS.md).
 
 ## 1. Create the infrastructure (from the repo root)
 
-`setup.sh` creates the IAM service role, the gateway (with `AWS_IAM` inbound auth),
-and the web-search target, then prints the gateway URL **and writes it into
-`skills/agentcore-websearch/.env`** so the search CLI works immediately.
+`setup.sh` deploys the CloudFormation stack `agentcore-websearch`
+([`cfn/agentcore-websearch.yaml`](cfn/agentcore-websearch.yaml): IAM service role +
+AgentCore Gateway with `AWS_IAM` inbound auth + web-search target), then prints the
+gateway URL **and writes it into `skills/agentcore-websearch/.env`** so the search CLI
+works immediately.
 
 ```bash
 # from the repo root; uses your current AWS credentials / AWS_PROFILE
 AWS_PROFILE=your-profile ./setup.sh
 ```
 
-Useful overrides (all optional — pass the same ones to `teardown.sh`):
+Useful overrides (all optional — pass the same `STACK_NAME` to `teardown.sh`):
 
 ```bash
+STACK_NAME=agentcore-websearch \
 GATEWAY_NAME=MyWebSearchGateway \
-ROLE_NAME=MyWebSearchGatewayRole \
+TARGET_NAME=web-search-tool \
 REGION=us-east-1 \
 AWS_PROFILE=your-profile ./setup.sh
 ```
@@ -125,11 +129,13 @@ confirmation policy, and how auth works).
 ```bash
 cd skills/agentcore-websearch
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
+pip install .            # installs the `agentcore-websearch` console command
 ```
 
-> The only dependency is [`mcp-proxy-for-aws`](https://pypi.org/project/mcp-proxy-for-aws/)
-> (it brings `boto3`, `botocore`, and the `mcp` SDK). The CLI imports its
+> The CLI is a proper Python package (`pyproject.toml`); `pip install .` (or
+> `pipx install .`) gives you an `agentcore-websearch` command. Its only dependency is
+> [`mcp-proxy-for-aws`](https://pypi.org/project/mcp-proxy-for-aws/) (which brings
+> `boto3`, `botocore`, and the `mcp` SDK); the CLI imports its
 > `aws_iam_streamablehttp_client` to do the SigV4 signing and MCP transport in-process.
 > `setup.sh` already wrote this folder's `.env`; to point at a different gateway, copy
 > `.env.example` to `.env` and edit `AGENTCORE_GATEWAY_URL`.
@@ -143,7 +149,7 @@ wrote, opens a SigV4-signed MCP connection with your local AWS credentials, and 
 **Smoke test** — confirm the gateway and tool are reachable:
 
 ```bash
-./websearch --list-tools
+agentcore-websearch --list-tools
 ```
 
 Expected (the tool name is namespaced by the target):
@@ -163,9 +169,9 @@ Expected (the tool name is namespaced by the target):
 **Run searches:**
 
 ```bash
-./websearch "latest AWS AgentCore announcement"
-./websearch "newest python version" --max-results 5
-./websearch "aws news" --json          # raw MCP result for parsing
+agentcore-websearch "latest AWS AgentCore announcement"
+agentcore-websearch "newest python version" --max-results 5
+agentcore-websearch "aws news" --json          # raw MCP result for parsing
 ```
 
 A successful search prints numbered results — each with a title, URL, publication
@@ -177,12 +183,12 @@ date, and snippet. For example:
    Web Search on Amazon Bedrock AgentCore, now generally available, ...
 ```
 
-**Direct Python invocation** (without the wrapper / `.env`):
+**Run the module directly** (equivalent to the console command):
 
 ```bash
 . .venv/bin/activate
 export AGENTCORE_GATEWAY_URL="https://<gateway-id>.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
-python agentcore_websearch.py "your query" --max-results 10
+python -m agentcore_websearch.cli "your query" --max-results 10
 ```
 
 **If a search fails**, the error usually tells you which credential is missing:
@@ -215,14 +221,14 @@ CLI flags `--gateway-url`, `--profile`, `--region` override the environment.
 ```
 .                                   # README, AGENTS.md, LICENSE, NOTICE, CONTRIBUTING, CODE_OF_CONDUCT
 ├── AGENTS.md                       # full setup/teardown guide (provision from the repo root)
-├── setup.sh                        # creates IAM role + gateway + web-search target
-├── teardown.sh                     # deletes everything setup.sh created
-├── iam/*.template.json             # IAM trust/permission templates (placeholders filled by setup.sh)
+├── setup.sh                        # deploys the CloudFormation stack, writes the skill .env
+├── teardown.sh                     # deletes the CloudFormation stack
+├── cfn/agentcore-websearch.yaml    # CloudFormation: IAM role + Gateway + web-search target
 └── skills/agentcore-websearch/     # ← search skill (copy this into ~/.claude/skills/)
     ├── SKILL.md                    # Claude Code skill definition (search only)
-    ├── websearch                   # bash wrapper; loads .env, requires AGENTCORE_GATEWAY_URL
-    ├── agentcore_websearch.py      # thin CLI: mcp-proxy-for-aws library + mcp SDK ClientSession
-    ├── requirements.txt            # mcp-proxy-for-aws (brings boto3/botocore/mcp SDK)
+    ├── pyproject.toml              # packaging: installs the `agentcore-websearch` command
+    ├── src/agentcore_websearch/    # the package (cli.py = entry point)
+    ├── websearch                   # convenience wrapper around the installed CLI
     └── .env.example                # copy to .env and fill in (setup.sh writes .env here)
 ```
 
@@ -240,10 +246,10 @@ Code skills directory:
 cp -r skills/agentcore-websearch ~/.claude/skills/
 ```
 
-Because the folder is self-contained (scripts, Python client, IAM templates, and
-`requirements.txt` all live inside it), that single `cp -r` is the entire install —
-no other files from the repo are needed. (You still clone the repo first to get the
-folder to copy.)
+Because the folder is self-contained (the packaged CLI and its `pyproject.toml` all
+live inside it), that single `cp -r` is the entire install — no other files from the
+repo are needed. (You still clone the repo first to get the folder to copy, and run
+`pip install .` in it.)
 
 The skill is **search-only** — it does not create or delete AWS resources. Provision
 the gateway once from the repo root (step 1, or [AGENTS.md](AGENTS.md)); `setup.sh`
