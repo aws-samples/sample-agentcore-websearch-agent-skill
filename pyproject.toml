@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "agentcore-websearch"
 version = "1.0.0"
 description = "CLI to search the web via an AWS Bedrock AgentCore Gateway using local AWS credentials (SigV4/IAM)."
-readme = "SKILL.md"
+readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT-0"
 keywords = ["aws", "bedrock", "agentcore", "mcp", "web-search", "sigv4"]

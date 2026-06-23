@@ -76,23 +76,24 @@ GATEWAY_URL=$(aws cloudformation describe-stacks \
   --region us-east-1 --stack-name agentcore-websearch \
   --query "Stacks[0].Outputs[?OutputKey=='GatewayUrl'].OutputValue" --output text)
 echo "$GATEWAY_URL"
-printf 'AGENTCORE_GATEWAY_URL=%s\n' "$GATEWAY_URL" > skills/agentcore-websearch/.env
+printf 'AGENTCORE_GATEWAY_URL=%s\n' "$GATEWAY_URL" > .env
 ```
 
-(If you use a profile, also append `AWS_PROFILE=<name>` to that `.env`.)
+(If you use a profile, also append `AWS_PROFILE=<name>` to `.env`.)
 
 ## 2. Search (handled by the skill — no AWS resource changes)
 
 ```bash
-cd skills/agentcore-websearch
+# from the project root
 python3 -m venv .venv && . .venv/bin/activate && pip install .   # once
 agentcore-websearch "latest AWS news"
 agentcore-websearch "newest python version" --max-results 5 --json
 ```
 
-See [`skills/agentcore-websearch/SKILL.md`](skills/agentcore-websearch/SKILL.md) for
-the full search reference. That skill is what you'd copy into `~/.claude/skills/` to
-use from Claude Code.
+The `agentcore-websearch` package lives at the repo root; the
+[`skills/agentcore-websearch/`](skills/agentcore-websearch/SKILL.md) folder is a
+search-only Claude Code skill that calls this same CLI (copy it into
+`~/.claude/skills/`).
 
 ## 3. Teardown — deletes AWS resources ⚠️ confirm first
 
@@ -104,7 +105,7 @@ use from Claude Code.
 ```bash
 aws cloudformation delete-stack --region us-east-1 --stack-name agentcore-websearch
 aws cloudformation wait stack-delete-complete --region us-east-1 --stack-name agentcore-websearch
-rm -f skills/agentcore-websearch/.env          # remove the stale gateway URL
+rm -f .env                                    # remove the stale gateway URL
 ```
 
 Verify nothing remains:
