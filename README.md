@@ -30,6 +30,22 @@ you ── agentcore-websearch CLI ──SigV4/MCP over HTTPS──▶ AgentCore
 - **Outbound** (gateway → connector): the gateway assumes a service role granting
   `bedrock-agentcore:InvokeWebSearch`, entirely within AWS.
 
+## CLI or MCP — which to use?
+
+The gateway is a plain MCP server, so any MCP client can call it directly (see
+[Use it directly over MCP](#use-it-directly-over-mcp-no-cli)). This repo also ships a
+small **CLI** on top. Pick by use case:
+
+| Use the **CLI** when… | Use **MCP directly** when… |
+|---|---|
+| You want to search from a shell, script, or cron job | You're wiring the tool into an MCP-aware agent/IDE |
+| You want human-readable output (or `--json` for piping) | The client manages the MCP session for you |
+| You want one self-contained command + a Claude Code skill | You don't want to install this package at all |
+
+The CLI adds ergonomics — argument validation (`--max-results`, query length),
+`.env` loading, tidy result formatting, and a packaged `agentcore-websearch` command —
+but it's optional. Both paths use the same gateway and the same IAM/SigV4 auth.
+
 ## Prerequisites
 
 - AWS credentials (`aws configure` / `AWS_PROFILE`) able to create IAM roles and
@@ -77,10 +93,49 @@ aws cloudformation delete-stack --region us-east-1 --stack-name agentcore-websea
 aws cloudformation wait stack-delete-complete --region us-east-1 --stack-name agentcore-websearch
 ```
 
+## Use it directly over MCP (no CLI)
+
+The gateway is a standard **streamable-HTTP MCP** endpoint, so you can skip this
+repo's CLI entirely and point any MCP client at it. Auth is **AWS SigV4 (IAM)** on
+service `bedrock-agentcore`, which most MCP clients can't sign on their own — so run
+AWS's [`mcp-proxy-for-aws`](https://pypi.org/project/mcp-proxy-for-aws/) as a local
+stdio MCP server that signs requests with your AWS credentials and forwards them to
+the gateway. No install of this package required (only `uv`/`uvx` or `pipx`).
+
+Configure it as an MCP server (generic form; field names vary by client). Use the
+gateway URL from step 1:
+
+```jsonc
+{
+  "mcpServers": {
+    "agentcore_websearch": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws",
+        "https://<gateway-id>.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+        "--region", "us-east-1"
+      ],
+      "env": { "AWS_PROFILE": "your-profile" }   // omit to use the default credential chain
+    }
+  }
+}
+```
+
+The MCP server exposes one tool, `WebSearch` (namespaced as
+`web-search-tool___WebSearch`), with arguments `query` (≤ 200 chars) and optional
+`maxResults` (1–25). Run the proxy standalone to inspect it:
+
+```bash
+uvx mcp-proxy-for-aws "$AGENTCORE_GATEWAY_URL" --region us-east-1
+```
+
+The caller's IAM principal needs `bedrock-agentcore:InvokeGateway` on the gateway.
+This is also how a Bedrock-hosted agent reaches the gateway — same proxy, same auth.
+
 ## Use it from Claude Code or Codex
 
-You can drive the gateway from a coding agent in two ways: as a **packaged skill**
-(via this repo's CLI) or as a **direct MCP server** (via `mcp-proxy-for-aws`).
+You can drive the gateway from a coding agent as a **packaged skill** (via this
+repo's CLI) or as a **direct MCP server**.
 
 ### Claude Code (skill)
 
@@ -96,8 +151,7 @@ cp -r skills/agentcore-websearch ~/.claude/skills/
 
 [Codex](https://developers.openai.com/codex/) reads this repo's
 [AGENTS.md](AGENTS.md) for guidance automatically. To give it the search tool,
-register `mcp-proxy-for-aws` as an MCP server in `~/.codex/config.toml` (point it at
-your gateway URL from step 1):
+register the proxy in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.agentcore_websearch]
@@ -105,10 +159,9 @@ command = "uvx"
 args = ["mcp-proxy-for-aws", "https://<gateway-id>.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp", "--region", "us-east-1"]
 ```
 
-The proxy SigV4-signs with your local AWS credentials (set `AWS_PROFILE` in the
-server's `env` if needed). The same stdio-MCP-server approach works for any
-MCP-compatible client (and for Claude Code via `claude mcp add`) if you'd rather not
-use the skill.
+This is the [direct-MCP](#use-it-directly-over-mcp-no-cli) approach above — it works
+for any MCP-compatible client (and for Claude Code via `claude mcp add`) if you'd
+rather not use the skill.
 
 ## More
 
