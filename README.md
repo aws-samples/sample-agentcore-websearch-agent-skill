@@ -99,7 +99,17 @@ agentcore-websearch "ecs vs eks" \
 ```
 
 The CLI reads `AGENTCORE_GATEWAY_URL` (and optional `AWS_PROFILE`) from a `.env` in
-the working directory or the environment. Its only dependency is
+the working directory or the environment. With a user-space install you'll usually
+want it set globally instead of per-directory — the helper script writes the export
+to your shell profile (auto-detecting `~/.zshrc` / `~/.bash_profile`):
+
+```bash
+./scripts/export-env.sh                          # reads GatewayUrl from the CFN stack
+./scripts/export-env.sh --profile my-aws-profile # also export AWS_PROFILE
+source ~/.zshrc                                  # apply to the current shell
+```
+
+Its only dependency is
 [`mcp-proxy-for-aws`](https://pypi.org/project/mcp-proxy-for-aws/), which handles the
 SigV4 signing and MCP transport.
 
