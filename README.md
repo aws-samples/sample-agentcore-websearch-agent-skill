@@ -40,8 +40,8 @@ options.
 - AWS credentials (`aws configure` / `AWS_PROFILE`) able to create IAM roles and
   AgentCore gateways, with access to Bedrock AgentCore in `us-east-1`.
 - **AWS CLI v2 ≥ 2.35.0** (older versions lack the gateway `connector` target shape).
-- **Python 3.9+** (only for the CLI) and/or [`uv`](https://docs.astral.sh/uv/) (only
-  for the direct-MCP option).
+- [`uv`](https://docs.astral.sh/uv/) (recommended — used to install the CLI and to
+  run the direct-MCP proxy) or `pipx`. **Python 3.9+** is also fine via `pip`.
 
 ## Setup — deploy the gateway (CloudFormation)
 
@@ -76,12 +76,14 @@ Pick the option that fits — all use the same gateway and the same IAM/SigV4 au
 The CLI adds ergonomics over raw MCP: argument validation, `.env` loading, tidy
 result formatting, and a packaged `agentcore-websearch` command.
 
+Install it to your user space so the `agentcore-websearch` command is available
+anywhere — no venv to activate (uses [`uv`](https://docs.astral.sh/uv/), or `pipx`):
+
 ```bash
+uv tool install .          # or: pipx install .
+
 # save the gateway URL where the CLI looks for it
 printf 'AGENTCORE_GATEWAY_URL=%s\n' "$GATEWAY_URL" > .env
-
-python -m venv .venv && . .venv/bin/activate
-pip install .                       # installs the `agentcore-websearch` command
 
 agentcore-websearch "latest AWS news"                       # basic search (default 10 results)
 agentcore-websearch "newest python version" -n 5            # -n / --max-results (1–25)
@@ -96,10 +98,15 @@ agentcore-websearch "ecs vs eks" \
   --region us-east-1
 ```
 
-The CLI reads `AGENTCORE_GATEWAY_URL` (and optional `AWS_PROFILE`) from `.env` or the
-environment. Its only dependency is
+The CLI reads `AGENTCORE_GATEWAY_URL` (and optional `AWS_PROFILE`) from a `.env` in
+the working directory or the environment. Its only dependency is
 [`mcp-proxy-for-aws`](https://pypi.org/project/mcp-proxy-for-aws/), which handles the
 SigV4 signing and MCP transport.
+
+To update after pulling changes: `uv tool install --force .` (or `pipx reinstall
+agentcore-websearch`). To remove: `uv tool uninstall agentcore-websearch`. Prefer a
+throwaway project venv instead? `python -m venv .venv && . .venv/bin/activate && pip
+install .` works too.
 
 ### Option B — Any MCP client (no CLI)
 

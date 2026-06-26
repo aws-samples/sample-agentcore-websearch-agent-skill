@@ -84,8 +84,8 @@ printf 'AGENTCORE_GATEWAY_URL=%s\n' "$GATEWAY_URL" > .env
 ## 2. Search (handled by the skill — no AWS resource changes)
 
 ```bash
-# from the project root
-python3 -m venv .venv && . .venv/bin/activate && pip install .   # once
+# from the project root — install once into user space (no venv to activate)
+uv tool install .            # or: pipx install .  (or a venv + `pip install .`)
 agentcore-websearch "latest AWS news"
 agentcore-websearch "newest python version" --max-results 5 --json
 ```

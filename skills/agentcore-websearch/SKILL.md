@@ -19,7 +19,7 @@ cited, and current.
 
 ## Prerequisites
 
-- The `agentcore-websearch` CLI on `PATH` (from `pip install .` / `pipx install .` in
+- The `agentcore-websearch` CLI on `PATH` (from `uv tool install .` / `pipx install .` in
   the project repo). Check with `agentcore-websearch --help`.
 - `AGENTCORE_GATEWAY_URL` available — exported, or in a `.env` in the working
   directory. (If the gateway isn't set up yet, follow the project's README/AGENTS.md.)
@@ -63,4 +63,4 @@ agentcore-websearch "AWS re:Invent 2026 keynotes" --max-results 15 --json
     or provision per the project's README/AGENTS.md.
   - credentials missing/expired → refresh your `AWS_PROFILE` / SSO login.
   - `Insufficient permissions` → caller lacks `bedrock-agentcore:InvokeGateway`.
-  - `agentcore-websearch: command not found` → `pip install .` in the project repo.
+  - `agentcore-websearch: command not found` → `uv tool install .` in the project repo.
