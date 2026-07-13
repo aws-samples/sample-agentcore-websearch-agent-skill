@@ -27,7 +27,7 @@ live in the shell that will run `agentcore-websearch`, so verify them with a rea
 
 ```bash
 # 1. Is the CLI installed and on PATH?
-command -v agentcore-websearch || echo "MISSING: run 'uv tool install .' in the project repo"
+command -v agentcore-websearch || echo "MISSING: run 'uv tool install git+https://github.com/aws-samples/sample-agentcore-websearch-agent-skill'"
 
 # 2. Is the gateway URL actually set in THIS shell's environment?
 echo "AGENTCORE_GATEWAY_URL=${AGENTCORE_GATEWAY_URL:-<empty>}"
@@ -96,4 +96,5 @@ agentcore-websearch "AWS re:Invent 2026 keynotes" --max-results 15 --json
     or provision per the project's README/AGENTS.md.
   - credentials missing/expired → refresh your `AWS_PROFILE` / SSO login.
   - `Insufficient permissions` → caller lacks `bedrock-agentcore:InvokeGateway`.
-  - `agentcore-websearch: command not found` → `uv tool install .` in the project repo.
+  - `agentcore-websearch: command not found` → install it:
+    `uv tool install git+https://github.com/aws-samples/sample-agentcore-websearch-agent-skill` (or `pipx install` the same URL).
