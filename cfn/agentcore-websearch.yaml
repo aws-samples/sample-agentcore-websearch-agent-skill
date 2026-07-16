@@ -18,6 +18,27 @@ Parameters:
     AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_-]*$"
 
 Resources:
+  # Customer-managed policy granting the gateway's outbound permissions, attached to
+  # the service role below (instead of an inline policy) so it's independently
+  # versioned, auditable, and reusable.
+  GatewayServicePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Permissions for the AgentCore Web Search gateway service role.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: InvokeGateway
+            Effect: Allow
+            Action: bedrock-agentcore:InvokeGateway
+            Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:gateway/*"
+          # NOTE: the working ARN includes the region; the docs' empty-region
+          # form (arn:aws:bedrock-agentcore::aws:tool/web-search.v1) is rejected.
+          - Sid: InvokeWebSearch
+            Effect: Allow
+            Action: bedrock-agentcore:InvokeWebSearch
+            Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:aws:tool/web-search.v1"
+
   # Service role the gateway assumes (outbound) to call the web-search connector.
   GatewayServiceRole:
     Type: AWS::IAM::Role
@@ -36,21 +57,8 @@ Resources:
                 aws:SourceAccount: !Ref AWS::AccountId
               ArnLike:
                 aws:SourceArn: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:gateway/*"
-      Policies:
-        - PolicyName: WebSearchGatewayInline
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: InvokeGateway
-                Effect: Allow
-                Action: bedrock-agentcore:InvokeGateway
-                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:gateway/*"
-              # NOTE: the working ARN includes the region; the docs' empty-region
-              # form (arn:aws:bedrock-agentcore::aws:tool/web-search.v1) is rejected.
-              - Sid: InvokeWebSearch
-                Effect: Allow
-                Action: bedrock-agentcore:InvokeWebSearch
-                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:aws:tool/web-search.v1"
+      ManagedPolicyArns:
+        - !Ref GatewayServicePolicy
 
   # The MCP gateway, authenticated inbound with the caller's IAM identity (SigV4).
   Gateway:
@@ -90,3 +98,6 @@ Outputs:
   GatewayServiceRoleArn:
     Description: ARN of the gateway service role.
     Value: !GetAtt GatewayServiceRole.Arn
+  GatewayServicePolicyArn:
+    Description: ARN of the customer-managed policy attached to the service role.
+    Value: !Ref GatewayServicePolicy
