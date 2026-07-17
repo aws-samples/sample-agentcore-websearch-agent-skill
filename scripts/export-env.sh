@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 #
 # export-env.sh — add AGENTCORE_GATEWAY_URL (and optionally AWS_PROFILE) to your
 # shell profile, so the `agentcore-websearch` CLI works in every new shell without
@@ -29,7 +31,7 @@ while [ $# -gt 0 ]; do
     --region)       REGION="$2"; shift 2 ;;
     --stack)        STACK_NAME="$2"; shift 2 ;;
     --profile-file) PROFILE_FILE="$2"; shift 2 ;;
-    -h|--help)      sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)      sed -n '5,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done

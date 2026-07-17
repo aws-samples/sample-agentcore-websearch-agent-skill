@@ -41,7 +41,7 @@ options.
   AgentCore gateways, with access to Bedrock AgentCore in `us-east-1`.
 - **AWS CLI v2 ≥ 2.35.0** (older versions lack the gateway `connector` target shape).
 - [`uv`](https://docs.astral.sh/uv/) (recommended — used to install the CLI and to
-  run the direct-MCP proxy) or `pipx`. **Python 3.9+** is also fine via `pip`.
+  run the direct-MCP proxy) or `pipx`. **Python 3.10+** is also fine via `pip`.
 
 ## Setup — deploy the gateway (CloudFormation)
 

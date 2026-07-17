@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 """
 agentcore-websearch — search the web via an AWS Bedrock AgentCore Gateway from the
 CLI, using your local AWS credentials (SigV4 / IAM). No API keys or bearer tokens.
